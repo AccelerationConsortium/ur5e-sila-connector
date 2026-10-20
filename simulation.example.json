@@ -1,0 +1,11 @@
+{
+  "simulation_mode": true,
+  "sila_server": {
+    "hostname": "127.0.0.1",
+    "port": 50052,
+    "tls": false,
+    "name": "UR5e Connector (Simulation)"
+  },
+  "cloud_server_endpoint": [],
+  "discovery": null
+}

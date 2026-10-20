@@ -1,0 +1,130 @@
+[
+  {
+    "id": "slow-dance",
+    "name": "Slow Dance",
+    "speed": 30,
+    "description": "Opening lift, left sway, right sway, and return. Sequential joint-space motion, relative to the current pose. Each bounded move stops before the next. No automatic repeat.",
+    "rows": [
+      {
+        "joint": "Base",
+        "delta": 15,
+        "phrase": "Opening"
+      },
+      {
+        "joint": "Shoulder",
+        "delta": -10,
+        "phrase": "Opening"
+      },
+      {
+        "joint": "Elbow",
+        "delta": 10,
+        "phrase": "Opening"
+      },
+      {
+        "joint": "Wrist1",
+        "delta": 10,
+        "phrase": "Opening"
+      },
+      {
+        "joint": "Wrist2",
+        "delta": -10,
+        "phrase": "Opening"
+      },
+      {
+        "joint": "Wrist3",
+        "delta": -10,
+        "phrase": "Opening"
+      },
+      {
+        "joint": "Base",
+        "delta": -30,
+        "phrase": "Sway left"
+      },
+      {
+        "joint": "Shoulder",
+        "delta": 5,
+        "phrase": "Sway left"
+      },
+      {
+        "joint": "Elbow",
+        "delta": -5,
+        "phrase": "Sway left"
+      },
+      {
+        "joint": "Wrist1",
+        "delta": -20,
+        "phrase": "Sway left"
+      },
+      {
+        "joint": "Wrist2",
+        "delta": 20,
+        "phrase": "Sway left"
+      },
+      {
+        "joint": "Wrist3",
+        "delta": -15,
+        "phrase": "Sway left"
+      },
+      {
+        "joint": "Base",
+        "delta": 30,
+        "phrase": "Sway right"
+      },
+      {
+        "joint": "Shoulder",
+        "delta": -5,
+        "phrase": "Sway right"
+      },
+      {
+        "joint": "Elbow",
+        "delta": 5,
+        "phrase": "Sway right"
+      },
+      {
+        "joint": "Wrist1",
+        "delta": 20,
+        "phrase": "Sway right"
+      },
+      {
+        "joint": "Wrist2",
+        "delta": -20,
+        "phrase": "Sway right"
+      },
+      {
+        "joint": "Wrist3",
+        "delta": 15,
+        "phrase": "Sway right"
+      },
+      {
+        "joint": "Base",
+        "delta": -15,
+        "phrase": "Return"
+      },
+      {
+        "joint": "Shoulder",
+        "delta": 10,
+        "phrase": "Return"
+      },
+      {
+        "joint": "Elbow",
+        "delta": -10,
+        "phrase": "Return"
+      },
+      {
+        "joint": "Wrist1",
+        "delta": -10,
+        "phrase": "Return"
+      },
+      {
+        "joint": "Wrist2",
+        "delta": 10,
+        "phrase": "Return"
+      },
+      {
+        "joint": "Wrist3",
+        "delta": 10,
+        "phrase": "Return"
+      }
+    ]
+  }
+]

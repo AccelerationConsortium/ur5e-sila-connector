@@ -1,0 +1,20 @@
+{
+  "simulation_mode": false,
+  "robot_host": "192.0.2.2",
+  "dashboard_port": 29999,
+  "enable_program_control": false,
+  "enable_base_step": false,
+  "enable_elbow_step": false,
+  "enable_joint_testing": false,
+  "enable_continuous_motion": false,
+  "joint_test_receipt_directory": "",
+  "approved_program": "",
+  "sila_server": {
+    "hostname": "127.0.0.1",
+    "port": 50054,
+    "tls": false,
+    "name": "UR5e (Motion Disabled)"
+  },
+  "cloud_server_endpoint": [],
+  "discovery": null
+}

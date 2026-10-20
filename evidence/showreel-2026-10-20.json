@@ -1,0 +1,62 @@
+{
+  "status": "completed_with_measured_trajectory",
+  "command_speed": 30,
+  "pendant_fraction": 0.28,
+  "sample_count": 3509,
+  "measured_ranges_degrees": [
+    {
+      "joint": "Base",
+      "min": -212.66700028165212,
+      "max": -192.6587534100435,
+      "span": 20.008246871608634
+    },
+    {
+      "joint": "Shoulder",
+      "min": -66.45106503667836,
+      "max": -51.438855656123934,
+      "span": 15.012209380554424
+    },
+    {
+      "joint": "Elbow",
+      "min": -86.38468092395287,
+      "max": -66.36862031593374,
+      "span": 20.01606060801913
+    },
+    {
+      "joint": "Wrist1",
+      "min": 266.993661261845,
+      "max": 297.00175951330317,
+      "span": 30.008098251458193
+    },
+    {
+      "joint": "Wrist2",
+      "min": 233.59848018090568,
+      "max": 263.6054956200094,
+      "span": 30.007015439103697
+    },
+    {
+      "joint": "Wrist3",
+      "min": 315.7561482728344,
+      "max": 345.77084084456516,
+      "span": 30.014692571730734
+    }
+  ],
+  "measured_peak_speeds_degrees_per_second": [
+    6.860075516499788,
+    5.9681761811880065,
+    6.954482391207704,
+    7.2695265742218345,
+    7.462105465417637,
+    7.44786452099816
+  ],
+  "max_return_error_degrees": 0.007540528843694077,
+  "date": "2026-10-20",
+  "robot_model": "UR5e",
+  "firmware": "5.4.2.76197",
+  "verified_steps": 30,
+  "sequence_type": "sequential single-axis out-and-back; not simultaneous multi-axis choreography",
+  "final_running": false,
+  "final_safety_status": "NORMAL",
+  "source": "Aggregate of locally retained RTDE CSV and SiLA receipts; raw files not included",
+  "continuous_dance_hardware_acceptance": "not established"
+}

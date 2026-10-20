@@ -1,0 +1,31 @@
+{
+  "template": "https://gitlab.com/unitelabs/cdk/connector-factory.git",
+  "commit": "c48304a91fd7bc838d6bd04c725dd5a3a74e8512",
+  "checkout": null,
+  "context": {
+    "cookiecutter": {
+      "connector_name": "UR5e Connector",
+      "project_name": "ur5e-connector",
+      "package_name": "ur5e_connector",
+      "__package_import_name": "unitelabs.ur5e_connector",
+      "__protocol_name": "Ur5eConnector",
+      "project_description": "Mac-hosted UR5e SiLA connector with a simulated device backend.",
+      "author_full_name": "Xi Sissi Feng",
+      "author_email": "",
+      "project_repo": "",
+      "communication_type": "none",
+      "env": "uv",
+      "_render_devdocs": false,
+      "_jinja2_env_vars": {
+        "lstrip_blocks": true,
+        "trim_blocks": true
+      },
+      "_extensions": [
+        "internal_ext.IsInternalExtension"
+      ],
+      "_template": "https://gitlab.com/unitelabs/cdk/connector-factory.git",
+      "_commit": "c48304a91fd7bc838d6bd04c725dd5a3a74e8512"
+    }
+  },
+  "directory": null
+}
