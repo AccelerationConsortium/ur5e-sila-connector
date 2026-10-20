@@ -61,3 +61,47 @@ def test_changed_during_read_rejects(tmp_path,monkeypatch):
     monkeypatch.setattr(Path,'read_text',changing_read)
     with pytest.raises(CommandRejected,match='changed while'):
         check_records(tmp_path)
+
+
+def test_windows_signature_detects_content_with_identical_metadata(tmp_path,monkeypatch):
+    import types
+    from pathlib import Path
+    from unitelabs.ur5e_connector.io import receipts
+    path=tmp_path/'a.json';write(path,'verified')
+    original_stat=Path.stat
+    frozen=path.stat()
+    monkeypatch.setattr(receipts,'sys',types.SimpleNamespace(platform='win32'))
+    monkeypatch.setattr(Path,'stat',lambda self,*a,**kw: frozen if self==path else original_stat(self,*a,**kw))
+    before=receipts.signature(path)
+    write(path,'not_sent')  # Same byte count; all metadata is deliberately frozen.
+    assert receipts.signature(path)!=before
+
+
+def test_windows_index_flushes_file_without_opening_directory(tmp_path,monkeypatch):
+    import types
+    from unitelabs.ur5e_connector.io import receipts
+    flushed=[]
+    original_fsync=os.fsync
+    def flush(fd):
+        flushed.append(fd);original_fsync(fd)
+    def forbidden(*args):
+        raise AssertionError('Windows directory open must not be attempted')
+    monkeypatch.setattr(receipts,'sys',types.SimpleNamespace(platform='win32'))
+    monkeypatch.setattr(receipts,'os',types.SimpleNamespace(fsync=flush,open=forbidden))
+    path=tmp_path/'index'
+    receipts.atomic_json(path,{'value':1})
+    receipts.atomic_json(path,{'value':2})
+    assert json.loads(path.read_text())=={'value':2}
+    assert len(flushed)==2
+    assert list(tmp_path.iterdir())==[path]
+
+
+def test_posix_directory_sync_failure_is_not_silenced(tmp_path,monkeypatch):
+    import types
+    from unitelabs.ur5e_connector.io import receipts
+    def denied(*args):
+        raise PermissionError('directory sync denied')
+    monkeypatch.setattr(receipts,'sys',types.SimpleNamespace(platform='linux'))
+    monkeypatch.setattr(receipts,'os',types.SimpleNamespace(fsync=os.fsync,open=denied,O_RDONLY=os.O_RDONLY))
+    with pytest.raises(PermissionError,match='directory sync denied'):
+        receipts.atomic_json(tmp_path/'index',{'value':1})

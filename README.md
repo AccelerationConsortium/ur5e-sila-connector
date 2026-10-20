@@ -1,6 +1,6 @@
 # UR5e SiLA Connector
 
-A Mac-hosted Universal Robots UR5e connector built with the UniteLabs CDK and SiLA 2. Includes an English browser control desk, a simulated device, read-only robot status, bounded joint commands, stepped sequences, and experimental continuous choreography.
+A host-based Universal Robots UR5e connector built with the UniteLabs CDK and SiLA 2. Includes an English browser control desk, a simulated device, read-only robot status, bounded joint commands, stepped sequences, and experimental continuous choreography. macOS/Linux use Bash scripts; native Windows uses PowerShell scripts with the same Python package and UI.
 
 **Start in simulation. Real motion is disabled in every shipped configuration.** Opening the UI never starts movement. This repository is a development connector, not a certified robot safety system.
 
@@ -8,7 +8,9 @@ A Mac-hosted Universal Robots UR5e connector built with the UniteLabs CDK and Si
 
 ## Quick start: no robot required
 
-Prerequisites: Git, [uv](https://docs.astral.sh/uv/getting-started/installation/), and Python 3.12. The setup command can use uv's managed Python installation. Python 3.12 on macOS is the development baseline; other controller and host versions need their own validation.
+**Windows users: start with the complete [Windows guide](docs/WINDOWS.md).** It includes PowerShell 7.4+ installation, equivalent launch commands, Ethernet setup, persistent paths, and the first-workstation acceptance checklist. Windows CI is separate from physical Windows-to-robot acceptance, which remains pending.
+
+The commands below are for macOS/Linux. Prerequisites: Git, [uv](https://docs.astral.sh/uv/getting-started/installation/), and Python 3.12. The setup command can use uv's managed Python installation. Python 3.12 on macOS is the physical development baseline; other controller and host versions need their own validation.
 
 ```bash
 git clone https://github.com/SissiFeng/ur5e-sila-connector.git
@@ -45,6 +47,7 @@ The first example exercises program states through real SiLA network calls to th
 
 | Task | Guide |
 | --- | --- |
+| Install and run on native Windows with PowerShell | [Windows guide](docs/WINDOWS.md) |
 | Operate the English UI, presets, speed, and saved poses | [UI guide](docs/UI_GUIDE.md) |
 | Connect Ethernet, start read-only mode, authorize motion, shut down | [Hardware setup](docs/HARDWARE.md) |
 | Understand commands, request IDs, receipts, and data storage | [SiLA and architecture](docs/ARCHITECTURE.md) |
@@ -78,7 +81,7 @@ Flow Dance has a separate speed cap and duration. Increasing its cap does not sh
 
 SiLA and HTTP listen on loopback. The panel uses a same-origin session token for changes. Do not expose these TLS-disabled development endpoints to the network.
 
-The wrapper scripts keep the environment, bytecode, and runtime data outside the checkout. On macOS, runtime data defaults to `~/Library/Application Support/UR5eConnector/<project-id>/`; the ID depends on the checkout path. Use a stable `UR5E_DATA_DIR` when relocating an existing installation. Preserve receipts and panel history together; do not start with an empty receipt directory to bypass an unresolved command.
+The wrapper scripts keep the environment, bytecode, and runtime data outside the checkout. On macOS, runtime data defaults to `~/Library/Application Support/UR5eConnector/<project-id>/`; on Windows it defaults to `%LOCALAPPDATA%\UR5eConnector\<checkout-id>\data`. The ID depends on the checkout path. Use a stable `UR5E_DATA_DIR` when relocating an existing installation. Preserve receipts and panel history together; do not start with an empty receipt directory to bypass an unresolved command.
 
 This repository excludes site IP addresses, authorization files, raw operational logs, and local runtime histories. The sanitized [hardware evidence summary](evidence/showreel-2026-10-20.json) reports measured results without publishing the original operator's recordings.
 

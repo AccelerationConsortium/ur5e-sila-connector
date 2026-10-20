@@ -1,6 +1,6 @@
 # Real UR5e setup
 
-The validated development baseline is a Mac and a UR5e with URSoftware 5.4.2.76197. The connector runs on the Mac; nothing is installed on the robot controller.
+The validated physical development baseline is a Mac and a UR5e with URSoftware 5.4.2.76197. The connector runs on the host computer; nothing is installed on the robot controller. The commands below use Bash. For native Windows equivalents, data paths, and the separate workstation acceptance checklist, follow [Windows setup](WINDOWS.md).
 
 ## Ethernet and read-only connection
 

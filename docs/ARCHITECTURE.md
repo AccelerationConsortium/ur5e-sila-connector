@@ -43,4 +43,6 @@ The panel stores jobs and named positions under its data directory. The control 
 
 Use an ordinary local directory outside managed/cloud-synchronized Documents storage. An earlier session measured about 105 seconds spent reading historical receipt bodies, versus milliseconds for a warmed local indexed scan. `examples/migrate_receipts.py --help` describes an offline migration that verifies copied bytes and does not clear invalid history. Preserve existing history and use fresh request IDs for genuinely new, reviewed commands only.
 
+On Windows, the file signature also hashes receipt content because creation time is not POSIX change time. This reads bytes even for cached entries, while skipping JSON parsing for unchanged receipts. The derived index uses a flushed, closed-file replacement without POSIX directory fsync; primary receipt validation and fail-closed behavior are preserved.
+
 HTTP changes require a same-origin session token, and both HTTP and SiLA bind to localhost by default. These local development endpoints have no network-user authentication and should not be exposed externally.

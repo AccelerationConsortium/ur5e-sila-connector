@@ -1,7 +1,7 @@
 [project]
 name = "unitelabs-ur5e-connector"
 version = "0.1.0"
-description = "Mac-hosted UR5e SiLA connector with a simulated device backend."
+description = "Host-based UR5e SiLA connector with simulation and an English control desk."
 readme = "README.md"
 authors = [{name = "Xi Sissi Feng"},]
 maintainers = [

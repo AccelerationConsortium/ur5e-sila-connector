@@ -1,8 +1,10 @@
 """Incremental receipt validation; index metadata never replaces changed-file validation."""
 
+import hashlib
 import json
 import os
 import pathlib
+import sys
 import tempfile
 import time
 
@@ -15,7 +17,14 @@ TERMINAL = {"verified", "not_sent"}
 def signature(path: pathlib.Path) -> list[int]:
     """Bind an index entry to file identity and mutation metadata."""
     stat = path.stat()
-    return [stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns]
+    # Windows ctime is creation time, so it cannot detect a rewrite with restored
+    # mtime. Hash bytes on Windows; unchanged content still avoids JSON parsing.
+    change_marker = (
+        int.from_bytes(hashlib.sha256(path.read_bytes()).digest(), "big")
+        if sys.platform == "win32"
+        else stat.st_ctime_ns
+    )
+    return [stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, change_marker]
 
 
 def atomic_json(path: pathlib.Path, value: dict) -> None:
@@ -28,11 +37,15 @@ def atomic_json(path: pathlib.Path, value: dict) -> None:
             stream.flush()
             os.fsync(stream.fileno())
         temporary.replace(path)
-        directory_fd = os.open(path.parent, os.O_RDONLY)
-        try:
-            os.fsync(directory_fd)
-        finally:
-            os.close(directory_fd)
+        # Windows cannot open a directory with os.open for fsync. This index is
+        # derived: its contents are flushed and the closed file is replaced;
+        # a lost index is rebuilt by validating the primary motion receipts.
+        if sys.platform != "win32":
+            directory_fd = os.open(path.parent, os.O_RDONLY)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
     finally:
         if temporary is not None:
             temporary.unlink(missing_ok=True)

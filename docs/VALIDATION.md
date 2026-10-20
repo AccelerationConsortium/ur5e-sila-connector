@@ -23,6 +23,12 @@ At closeout, all real motion flags were disabled and real SiLA services were sto
 5. Separately qualify continuous multi-axis movement with recorded per-axis tracking and operator observation before increasing amplitude or speed.
 6. Preserve histories and return all motion flags to false at closeout.
 
+## Windows preparation
+
+Native Windows uses PowerShell 7.4+ wrappers and local application-data paths. The CI matrix includes Windows and tests wrapper argument forwarding, paths with spaces, exit codes, missing environments, and dependency-installation failure. Receipt tests cover Windows content fingerprints and index replacement, and preserve POSIX directory-sync error handling. Inspect the current GitHub Actions run for actual results.
+
+Physical Windows-to-controller acceptance is pending. Use the [Windows workstation checklist](WINDOWS.md#tomorrows-workstation-acceptance) before authorizing a real test. In headless Windows CI, only local test servers are terminated during fixture cleanup; interactive Ctrl-C and physical stop behavior remain separate workstation checks.
+
 ## Development backlog
 
 - Integrate full six-axis recording and measured summaries into each UI run.

@@ -44,8 +44,16 @@ async def sila_client(tmp_path, request, dashboard):
             yield client
         finally:
             await client.close()
+            expected_returncode = 0
             if process.returncode is None:
-                process.send_signal(signal.SIGINT)
+                if sys.platform == "win32":
+                    # Headless Windows runners cannot reliably deliver console
+                    # SIGINT. Terminate only this local test server; this does
+                    # not validate operator Ctrl-C or physical robot shutdown.
+                    process.terminate()
+                    expected_returncode = 1
+                else:
+                    process.send_signal(signal.SIGINT)
                 try:
                     await asyncio.wait_for(process.wait(), timeout=10)
                 except TimeoutError:
@@ -53,7 +61,7 @@ async def sila_client(tmp_path, request, dashboard):
                     await process.wait()
             log.seek(0)
             output = log.read()
-            assert process.returncode == 0, output
+            assert process.returncode == expected_returncode, output
             assert "Duplicate handler" not in output, output
             assert "UserWarning" not in output, output
 

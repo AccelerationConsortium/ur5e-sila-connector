@@ -1,5 +1,7 @@
 # Record measured six-axis trajectories
 
+On native Windows, run the same example using `.\scripts\run.ps1` instead of `bash scripts/run.sh`. See [Windows recording](WINDOWS.md#record-and-close-out-a-later-authorized-test) for the full command and workstation checklist.
+
 Motion receipts and full trajectories are different evidence. A completion receipt may preserve only starting/final state and a sample count. Planned angle ranges are not measured ranges.
 
 The output-only recorder below reads real-controller RTDE at 20 Hz. It sends no motion commands, and it is independent of the UI/SiLA execution path. Start it before submitting a reviewed sequence through the UI. Keep the pendant operator in place.

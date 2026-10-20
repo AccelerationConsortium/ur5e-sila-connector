@@ -8,7 +8,7 @@ __version__ = version("unitelabs-ur5e-connector")
 
 @dataclasses.dataclass
 class Ur5eConnectorConfig(ConnectorBaseConfig):
-    """Configure the Mac-hosted UR5e connector."""
+    """Configure the host-based UR5e connector."""
 
     simulation_mode: bool = True
     """Run without a physical robot. Disable to connect to the configured controller."""

@@ -2,6 +2,8 @@
 
 ## Open the correct panel
 
+Windows uses this same English UI. Use the PowerShell commands in the [Windows guide](WINDOWS.md) to start its services; the navigation, presets, and workflow below are unchanged.
+
 Simulation: start the connector on 50052, then the panel with `--simulation --port 8766`; open http://127.0.0.1:8766/.
 
 Real robot: follow [Hardware setup](HARDWARE.md), then open http://127.0.0.1:8765/. The header must say **REAL ROBOT**. A simulation label describes the connector backend; it does not independently confirm the pendant's own Simulation switch.

@@ -9,7 +9,9 @@ bash scripts/run.sh ruff format --check src/
 bash scripts/run.sh ruff check src/
 ```
 
-CI runs the same offline suite on Ubuntu and macOS. CI never connects to a physical controller. Run the simulation quick start to verify the browser journey after changing the panel.
+On Windows, use PowerShell 7.4+ and replace `bash scripts/setup.sh` with `.\scripts\setup.ps1`, and `bash scripts/run.sh` with `.\scripts\run.ps1`. See [Windows setup](docs/WINDOWS.md).
+
+CI runs the same offline suite on Ubuntu, macOS, and Windows, plus native PowerShell wrapper tests on Windows. CI never connects to a physical controller. Windows test-server cleanup uses termination rather than a console interrupt; it does not qualify interactive shutdown. Run the simulation quick start to verify the browser journey after changing the panel.
 
 Keep all repository documentation, user-facing messages, comments, and UI copy in English. Preserve the io/features split: io owns hardware communication, conversions, state guards, receipts, and simulation; feature methods delegate and expose SiLA metadata. The panel calls SiLA instead of sending robot scripts directly.
 
