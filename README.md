@@ -1,6 +1,6 @@
 # UR5e SiLA Connector
 
-Control a Universal Robots UR5e through **SiLA 2**, with an English browser Control Desk and a visual **Action Composer**. Run the same Python connector on macOS, Linux or native Windows using the UniteLabs CDK.
+Control a Universal Robots UR5e through **SiLA 2**, with a Control Desk and a visual **Action Composer**. Run the same Python connector on macOS, Linux or native Windows using the UniteLabs CDK.
 
 Design a continuous six-axis action chain in the browser, validate it through SiLA, and inspect execution progress and trajectory data. Start with the simulated device before connecting a robot.
 
@@ -101,11 +101,6 @@ The first example exercises program states through real SiLA network calls to th
 
 The development robot was a UR5e running URSoftware **5.4.2.76197**. This does not establish compatibility with every UR firmware version. Remote Control must be confirmed at the pendant; the 5.4 integration does not query that switch.
 
-## Speed is not a promise of measured speed
-
-Jog and stepped command speeds range from 1–40 degrees per second. The pendant slider also scales motion. At a 30 degrees/second command with a 28% slider, the nominal scaled cap is 8.4 degrees/second; the recorded Showreel peak was about 7.46 degrees/second. Acceleration and short moves reduce the achieved peak further. The connector never automatically raises the pendant slider.
-
-Action Composer also accepts 1–40 degrees/second and calculates travel time for the authored path. You do not need to enter a separate travel time for each action. Acceleration limits, reversals, holds and the pendant slider affect the achieved speed. Stepped routines use their own speed slider. The older Flow Dance API remains available for compatibility; the Sequences page now uses Action Composer.
 
 ## Data and defaults
 
@@ -114,15 +109,3 @@ SiLA and HTTP listen on loopback. The panel uses a same-origin session token for
 The wrapper scripts keep the environment, bytecode, and runtime data outside the checkout. On macOS, runtime data defaults to `~/Library/Application Support/UR5eConnector/<project-id>/`; on Windows it defaults to `%LOCALAPPDATA%\UR5eConnector\<checkout-id>\data`. The ID depends on the checkout path. Use a stable `UR5E_DATA_DIR` when relocating an existing installation. Preserve receipts and panel history together; do not start with an empty receipt directory to bypass an unresolved command.
 
 This repository excludes site IP addresses, authorization files, raw operational logs, and local runtime histories. The sanitized [hardware evidence summary](evidence/showreel-2026-10-20.json) reports measured results without publishing the original operator's recordings.
-
-## Vendor references
-
-- [UniteLabs connector development installation](https://docs.unitelabs.io/connector-development/getting-started/installation/)
-- [Universal Robots Dashboard Server, e-Series, port 29999](https://www.universal-robots.com/articles/ur/dashboard-server-e-series-port-29999/)
-
-This project is independently developed and is not an official Universal Robots product. Dependency and template licenses remain with their respective owners. No additional distribution license is granted by this repository at present.
-
-
-## Moving this repository to an organization
-
-After transferring the repository, use the organization's clone URL in place of the owner URL in these guides. Existing users can update their checkout with `git remote set-url origin <new-repository-url>`. Documentation and screenshot links use relative paths and move with the repository. Keep the local runtime-data directory and motion receipts when relocating a checkout. Review organization access, Actions settings and the distribution-license decision before sharing more widely.
