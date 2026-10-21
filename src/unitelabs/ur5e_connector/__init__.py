@@ -28,6 +28,8 @@ async def create_app(config: Ur5eConnectorConfig) -> collections.abc.AsyncGenera
         elbow_step_receipt=config.elbow_step_receipt,
         enable_joint_testing=config.enable_joint_testing,
         enable_continuous_motion=config.enable_continuous_motion,
+        enable_action_chains=config.enable_action_chains,
+        enable_feedback_motion=config.enable_feedback_motion,
         joint_test_receipt_directory=config.joint_test_receipt_directory,
     )
     app.register(LockController())

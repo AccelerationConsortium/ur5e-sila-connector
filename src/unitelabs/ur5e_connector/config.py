@@ -46,6 +46,12 @@ class Ur5eConnectorConfig(ConnectorBaseConfig):
     enable_continuous_motion: bool = False
     """Enable real continuous dance/reset only after separate hardware qualification. Simulation remains available."""
 
+    enable_action_chains: bool = False
+    """Separately qualify real user-authored waypoint chains; never enabled by the dance flag."""
+
+    enable_feedback_motion: bool = False
+    """Enable RTDE-register playback only after separate controller qualification."""
+
     joint_test_receipt_directory: str = ""
     """Persistent request records; duplicate IDs and incomplete earlier requests prevent movement."""
 

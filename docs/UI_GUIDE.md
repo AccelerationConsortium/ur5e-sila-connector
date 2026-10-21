@@ -73,3 +73,17 @@ In **Sequences**, choose distinct **Approach** and **Target** saved positions, t
 - **Inspect last failed run** compares the latest failed panel job with its existing SiLA receipt. It does not replay a command or clear a fault.
 - Refreshing the page resets unsaved builder rows. It does not cancel an active server-owned run.
 - At closeout, confirm stopped state, disable real authorization flags, stop the real connector services, and save recordings. See [Hardware shutdown](HARDWARE.md#shutdown).
+
+## Action Composer
+
+Select **Open Action Composer** or open `/composer` on the same panel. This editor supports continuous, simultaneous six-axis waypoint chains, joint-handle dragging, exact angle inputs, saved browser drafts and portable JSON files. Follow the [complete Action Composer guide](ACTION_COMPOSER.md) before preparing or executing a chain. Simulation and real device execution remain explicitly separated.
+
+## TCP tasks, progress, interruption and reusable datasets
+
+Open **Action Composer** for the integrated workflow. Use **TCP targets & fixed-location tasks** for position/orientation authoring and no-gripper rehearsal. **Live execution** provides optional Stop all and Pause after action. **Task library & episodes** saves reusable teaching and exports simulated or measured run data. Follow the complete [Task workflows guide](TASK_WORKFLOWS.md), including coordinate units, continuation semantics and the separate real-controller qualification boundary.
+
+## Integrated Action Composer
+
+Open Control Desk and choose **02 Sequences**. Action Composer replaces Flow Dance in this workspace. Design six-axis poses, save waypoints, validate through SiLA, preview, and explicitly run once. Its speed and optional Stop/Pause controls are independent of jog and stepped routines. Changing workspace tabs preserves the editor; browser drafts and task storage remain on the same origin. The direct `/composer` address remains compatible.
+
+Expand **Stepped routines & saved-position sequences** for the previous one-axis routines, their speed slider, preview and execution controls. A page refresh or navigation never starts movement.

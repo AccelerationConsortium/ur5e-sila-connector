@@ -22,27 +22,16 @@
         <div class="quick-row"><div><h3>Build a repeatable motion.</h3><p>Compose a sequence or start with a ready-made routine.</p></div><button class="outline" id="open-sequences">Open sequence builder <span>↗</span></button></div>
       </section>
       <section id="view-sequences" class="view" hidden>
-        <div class="section-heading"><div><div class="eyebrow">ONE AXIS AT A TIME</div><h2>Sequence builder</h2></div><button class="outline small" id="add-step">+ Add move</button></div>
-        <section class="continuous-panel teach-panel">
-          <div class="eyebrow">CONTINUOUS / ALL SIX AXES</div><h3>Flow Dance</h3>
-          <p>One controller-local trajectory: opening sway, lift and bow, counter-rotation, wrist ripple, and a smooth return. All six joint targets evolve together; no stops between phrases.</p>
-          <p class="fine-print">Inspired by the screen-arm choreography reference. Joint-space validation only; this does not predict collisions or reproduce the video's Cartesian path.</p>
-          <div class="workflow-inputs"><label>Peak speed cap (°/s)<input id="flow-speed" type="number" min="1" max="40" value="20"></label><label>Duration (controller seconds)<select id="flow-duration"><option value="30">30 seconds</option><option value="45">45 seconds</option><option value="60" selected>60 seconds</option><option value="90">90 seconds</option><option value="120">120 seconds</option></select></label></div>
-          <div class="flow-actions"><button class="outline" id="motion-check">Run preflight</button><button class="primary" id="flow-preview">Preview continuous dance</button><button class="outline" id="low-speed-preview">Preview low-speed test (¼ range, 30 s)</button><button class="outline" id="reset-preview" disabled>Preview return to reference</button></div>
-          <div id="motion-checks" class="motion-checks">Run preflight to check live state. PolyScope 5.4 Remote Control requires on-site confirmation.</div>
-          <div id="flow-summary" class="fine-print">No continuous trajectory prepared. A reset returns to the captured reference, never automatically to zero.</div>
-          <svg id="flow-chart" viewBox="0 0 600 180" role="img" aria-label="Six joint angle traces over controller time" hidden></svg><div id="flow-ranges" class="flow-ranges"></div>
-          <label class="fine-print"><input type="checkbox" id="remote-confirmed"> I confirmed Remote Control on the pendant (real mode only).</label>
-          <div class="flow-actions"><button class="primary" id="flow-run" disabled>Run prepared motion once</button><button class="outline" id="inspect-run">Inspect last failed run</button></div>
-          <p id="flow-gate" class="fine-print">Real continuous execution remains disabled until separate hardware qualification. Preview and simulation are available.</p>
-          <p class="fine-print">Continuous motion cannot be cancelled between internal setpoints from this page. Use the pendant for an immediate stop. Simulation uses accelerated time and does not validate robot dynamics.</p>
-          <pre id="motion-inspection" class="motion-inspection" hidden></pre>
-        </section>
+        <div class="section-heading"><div><div class="eyebrow">CONTINUOUS / ALL SIX AXES</div><h2>Action Composer</h2><p>Design poses, validate through SiLA, and run your action chain.</p></div></div>
+        <iframe id="action-composer" title="Six-axis Action Composer" data-src="/composer/embed"></iframe>
+        <details id="legacy-sequences"><summary>Stepped routines &amp; saved-position sequences</summary><div class="legacy-grid"><div>
+        <div class="section-heading"><h3>Stepped sequence builder</h3><button class="outline small" id="add-step">+ Add move</button></div>
         <div class="teach-panel dance-panel"><div class="eyebrow">COMPLETE ROUTINE / FOUR PHRASES</div><h3>Stepped Dance</h3><p>Opening lift → sway left → sway right → return. All six axes, one ready-made sequence. Relative to the starting pose; each bounded move stops before the next.</p><button class="primary" id="load-dance" disabled>Load Stepped Dance ↗</button><p class="fine-print">Loads 24 rows at 30°/s. Review every joint range in Preview before running. No automatic repeat.</p></div>
         <div class="recipe-grid"><button class="recipe" data-recipe="sweep"><span class="recipe-number">01</span><strong>Joint sweep</strong><small>Wrist1 +10°, then return</small></button><button class="recipe" data-recipe="demo"><span class="recipe-number">02</span><strong>Six-axis showreel</strong><small>Distinct motion. Return to start.</small></button><button class="recipe" data-recipe="gentle"><span class="recipe-number">03</span><strong>Gentle round trip</strong><small>Each axis +5°, then return</small></button></div>
         <div class="editor"><div class="editor-head"><span>#</span><span>JOINT / POSITION</span><span>RELATIVE ANGLE</span><span></span></div><div id="sequence-rows"></div><div class="editor-footer"><span id="row-count">0 moves</span><button class="text-button" id="clear-sequence">Clear sequence</button></div></div>
         <button class="primary preview-button" id="preview-sequence">Preview sequence <span>→</span></button>
         <div class="workflow-panel"><div class="eyebrow">SAVED-POINT ROUTINE</div><h3>Approach → target → retreat</h3><p>Select two taught poses. No gripper actions are included.</p><div class="workflow-inputs"><label>Approach<select id="approach-position"><option value="">Record a position first</option></select></label><label>Target<select id="target-position"><option value="">Record a position first</option></select></label><button class="outline" id="load-approach">Create routine</button></div><p class="fine-print">Stored joint poses define the route. Preview and review the joint-space moves before running.</p></div>
+        </div><div id="legacy-inspector-host"></div></div></details>
       </section>
       <section id="view-positions" class="view" hidden>
         <div class="section-heading"><div><div class="eyebrow">TEACH ONCE / REUSE</div><h2>Saved positions</h2></div><span class="section-tag">JOINT POSES + TCP</span></div>
@@ -50,11 +39,11 @@
         <div id="position-list" class="position-list"></div><div id="position-empty" class="empty-state"><span>＋</span><h3>Your first taught position.</h3><p>Save an approach pose and a target pose to build a fixed-point routine. A saved pose does not trigger movement.</p></div>
       </section>
     </div>
-    <aside class="inspector">
-      <section class="speed-panel"><div class="eyebrow">JOG / STEPPED SPEED</div><div class="speed-value"><output id="speed-value">10</output><span>°/s</span></div><label class="sr-only" for="speed">Command speed in degrees per second</label><input type="range" id="speed" min="1" max="40" step="1" value="10"><div class="range-labels"><span>1°/s</span><span>40°/s</span></div><div class="speed-detail"><span>Pendant speed</span><strong id="pendant-speed">—</strong></div><div class="speed-detail"><span>Estimated speed cap</span><strong id="effective-speed">—</strong></div><p class="fine-print">This slider controls jog and stepped moves. Flow Dance uses its own duration and speed cap. The pendant also scales motion.</p></section>
+    <div id="live-inspector-host"><aside class="inspector">
+      <section class="speed-panel"><div class="eyebrow">JOG / STEPPED SPEED</div><div class="speed-value"><output id="speed-value">10</output><span>°/s</span></div><label class="sr-only" for="speed">Command speed in degrees per second</label><input type="range" id="speed" min="1" max="40" step="1" value="10"><div class="range-labels"><span>1°/s</span><span>40°/s</span></div><div class="speed-detail"><span>Pendant speed</span><strong id="pendant-speed">—</strong></div><div class="speed-detail"><span>Estimated speed cap</span><strong id="effective-speed">—</strong></div><p class="fine-print">This slider controls jog and stepped moves. Action Composer has its own motion speed. The pendant also scales motion.</p></section>
       <section class="preview-panel"><div class="section-heading compact"><div class="eyebrow">NEXT RUN</div><span class="mini-pill" id="preview-label">NO PREVIEW</span></div><h3 id="preview-title">Ready when you are.</h3><p id="preview-description">Build and preview a sequence to inspect its targets.</p><div id="preview-target" class="preview-target"></div><button class="primary full" id="run-preview" disabled>Run once <span>↗</span></button><p class="fine-print" id="run-note">Motion starts only after an explicit action.</p></section>
       <section class="run-panel"><div class="eyebrow">EXECUTION</div><div class="run-heading"><strong id="run-state">Idle</strong><span id="run-progress-text">0 / 0</span></div><div class="progress-track"><div id="run-progress"></div></div><p id="current-move">No active sequence.</p><button class="cancel-button full" id="cancel-run" disabled>Cancel after current move</button><p class="fine-print">This cancels queued moves. Use the pendant to stop an active move immediately.</p></section>
-    </aside>
+    </aside></div>
   </div>
   <section class="activity-panel"><div class="section-heading compact"><div class="eyebrow">RECENT ACTIVITY</div><span class="tiny-label">PERSISTENT RUN HISTORY</span></div><div id="activity-list"><p class="muted">No panel runs yet.</p></div></section>
   <footer><span><span class="amber">●</span> LOCAL SESSION · SI​LA 2</span><span>UR5e Control Desk <span class="footer-divider">/</span> No gripper connected</span></footer>

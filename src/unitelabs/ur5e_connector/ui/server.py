@@ -29,6 +29,15 @@ class PanelServer(http.server.ThreadingHTTPServer):
             "/app.js": ("text/javascript; charset=utf-8", (static / "app.js").read_bytes()),
             "/style.css": ("text/css; charset=utf-8", (static / "style.css").read_bytes()),
         }
+        for route, filename, mime in (
+            ("/composer", "composer.html", "text/html; charset=utf-8"),
+            ("/composer.js", "composer.js", "text/javascript; charset=utf-8"),
+            ("/composer-rotation.js", "composer-rotation.js", "text/javascript; charset=utf-8"),
+            ("/composer.css", "composer.css", "text/css; charset=utf-8"),
+        ):
+            self.assets[route] = (mime, (static / filename).read_bytes())
+        mime, composer = self.assets["/composer"]
+        self.assets["/composer/embed"] = (mime, composer.replace(b"<body>", b'<body class="embedded">', 1))
         super().__init__(("127.0.0.1", port), PanelHandler)
         actual_port = self.server_address[1]
         self.hosts = {f"127.0.0.1:{actual_port}", f"localhost:{actual_port}"}
@@ -65,10 +74,11 @@ class PanelHandler(http.server.BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
+        ancestors = "'self'" if urllib.parse.urlsplit(self.path).path == "/composer/embed" else "'none'"
         self.send_header(
             "Content-Security-Policy",
             "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; "
-            "connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'; form-action 'self'",
+            f"connect-src 'self'; img-src 'self' data:; frame-ancestors {ancestors}; form-action 'self'",
         )
         self.end_headers()
         with contextlib.suppress(BrokenPipeError, ConnectionResetError):
@@ -95,6 +105,15 @@ class PanelHandler(http.server.BaseHTTPRequestHandler):
             self._send(content, mime)
         elif route == "/api/session":
             self._json({"token": self.server.token})
+        elif route.startswith("/api/tasks/"):
+            task_id = route.removeprefix("/api/tasks/")
+            record = self.server.service.task_library.get(task_id)
+            self._json(record if record else {"error": "Task not found."}, 200 if record else 404)
+        elif route.startswith("/api/datasets/"):
+            try:
+                self._json(self._dispatch(self.server.service.dataset(route.removeprefix("/api/datasets/"))))
+            except (PanelError, OSError, ValueError) as error:
+                self._json({"error": str(error)}, 400)
         elif route == "/api/status":
             try:
                 self._json(self._dispatch(self.server.service.status()))
@@ -120,8 +139,18 @@ class PanelHandler(http.server.BaseHTTPRequestHandler):
                 msg = "A JSON object is required."
                 raise PanelError(msg)
             route = urllib.parse.urlsplit(self.path).path
-            if route == "/api/motion/check":
+            if route == "/api/kinematics":
+                result = self._dispatch(self.server.service.kinematics(payload))
+            elif route == "/api/motion/control":
+                result = self._dispatch(self.server.service.control_motion(payload))
+            elif route == "/api/tasks":
+                result = self._dispatch(self.server.service.save_task(payload))
+            elif route == "/api/motion/check":
                 result = self._dispatch(self.server.service.check_motion())
+            elif route == "/api/action-chain/preview":
+                result = self._dispatch(self.server.service.preview_action_chain(payload))
+            elif route == "/api/action-chain/suggest":
+                result = self._dispatch(self.server.service.suggest_action_chain_timing(payload))
             elif route == "/api/motion/preview":
                 result = self._dispatch(self.server.service.preview_continuous(payload))
             elif route == "/api/motion/run":

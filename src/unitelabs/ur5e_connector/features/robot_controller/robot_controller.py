@@ -122,6 +122,127 @@ class RobotController(sila.Feature):
         """
         return await self.protocol.motion_preflight()
 
+    @sila.UnobservableProperty()
+    async def get_motion_progress(self) -> str:
+        """
+        Read run-bound controller progress independently of the execution lock.
+
+        Returns:
+          Progress: JSON progress with request ID, completed actions and evidence source.
+        """
+        return await self.protocol.get_motion_progress()
+
+    @sila.UnobservableCommand()
+    async def control_active_motion(self, request_id: str, action: str, expected_simulation_mode: bool) -> str:
+        """
+        Request optional stop or pause at the next reachable action boundary.
+
+        Args:
+          RequestId: Exact active connector-owned motion request.
+          Action: stop or pause_after_action; never starts or resumes movement.
+          ExpectedSimulationMode: Reviewed backend mode.
+
+        Returns:
+          Report: Request acknowledgement; completion must be read from progress and receipt.
+
+        Raises:
+          CommandRejected: If ID, mode or supported operation does not match.
+        """
+        return await self.protocol.control_active_motion(request_id, action, expected_simulation_mode)
+
+    @sila.UnobservableCommand()
+    async def read_motion_trace(self, request_id: str) -> str:
+        """
+        Read recorded motion telemetry without starting or retrying movement.
+
+        Args:
+          RequestId: Existing motion identifier in this connector's receipt directory.
+
+        Returns:
+          Trace: JSON samples labelled as simulated or measured.
+
+        Raises:
+          CommandRejected: If the identifier or trace is unavailable.
+        """
+        return await self.protocol.read_motion_trace(request_id)
+
+    @sila.UnobservableCommand()
+    async def solve_tcp(self, payload_json: str) -> str:
+        """
+        Calculate nominal TCP kinematics or a pickup rehearsal draft without moving.
+
+        Args:
+          PayloadJson: JSON operation forward, inverse or task, seed radians and explicit TCP offset.
+
+        Returns:
+          Report: Nominal solution or task waypoints; no collision or calibration acceptance.
+
+        Raises:
+          CommandRejected: If inputs, limits or nearby IK cannot be solved.
+        """
+        return await self.protocol.solve_tcp(payload_json)
+
+    @sila.UnobservableCommand()
+    async def prepare_action_chain(self, waypoints_json: str, speed: float, expected_simulation_mode: bool) -> str:
+        """
+        Prepare a continuous six-axis chain without sending movement.
+
+        Args:
+          WaypointsJson: JSON list of 1-24 poses with six absolute degrees, duration, optional hold and name.
+          Speed: Peak joint-speed cap, 1-40 degrees per second.
+          ExpectedSimulationMode: Reviewed backend mode; changes reject preparation.
+
+        Returns:
+          Plan: Server-owned preview, sampled ranges and derivative checks, expiring after 180 seconds.
+
+        Raises:
+          CommandRejected: If input, state, limits or derivative checks fail.
+          DeviceUnavailable: If actual state cannot be read.
+        """
+        return await self.protocol.prepare_action_chain(waypoints_json, speed, expected_simulation_mode)
+
+    @sila.UnobservableCommand()
+    async def prepare_action_chain_at_speed(
+        self, waypoints_json: str, speed: float, expected_simulation_mode: bool
+    ) -> str:
+        """
+        Calculate travel times and prepare a continuous chain from one speed setting.
+
+        Args:
+          WaypointsJson: JSON list of 1-24 poses with six absolute degrees, optional name and hold; no duration.
+          Speed: Peak joint-speed cap, 1-40 degrees per second; also determines automatic acceleration bounds.
+          ExpectedSimulationMode: Reviewed backend mode; changes reject preparation.
+
+        Returns:
+          Plan: Checked trajectory with calculated travel times, measured starting pose and one-shot expiry.
+
+        Raises:
+          CommandRejected: If input, state, limits or automatic timing bounds fail.
+          DeviceUnavailable: If actual state cannot be read.
+        """
+        return await self.protocol.prepare_action_chain(waypoints_json, speed, expected_simulation_mode, True)
+
+    @sila.UnobservableCommand()
+    async def suggest_action_chain_timing(
+        self, waypoints_json: str, speed: float, expected_simulation_mode: bool
+    ) -> str:
+        """
+        Calculate timing suggestions without changing poses or preparing execution.
+
+        Args:
+          WaypointsJson: JSON list of six-axis waypoints with absolute degrees, duration and optional hold/name.
+          Speed: Requested peak joint-speed cap, 1-40 degrees per second.
+          ExpectedSimulationMode: Reviewed backend mode.
+
+        Returns:
+          Report: Kinematic timing alternatives and predicted derivatives; no changes applied.
+
+        Raises:
+          CommandRejected: If input, mode or stationary preflight is invalid.
+          DeviceUnavailable: If actual state cannot be read.
+        """
+        return await self.protocol.suggest_action_chain_timing(waypoints_json, speed, expected_simulation_mode)
+
     @sila.UnobservableCommand()
     async def prepare_continuous_dance(self, speed: float, duration: float, expected_simulation_mode: bool) -> str:
         """
@@ -191,7 +312,7 @@ class RobotController(sila.Feature):
         remote_control_confirmed: bool,
     ) -> str:
         """
-        Execute one reviewed continuous dance or reset, with no automatic replay.
+        Execute one reviewed continuous dance, reset or action chain, with no automatic replay.
 
         Args:
           PlanId: Unexpired prepared trajectory identifier.

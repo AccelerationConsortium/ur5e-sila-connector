@@ -117,6 +117,10 @@ def build(
 
 def script(plan: dict) -> str:
     """Generate one controller-local servo loop, with no intermediate stop or network pacing."""
+    if plan["kind"] == "action_chain":
+        from .action_chain import script as chain_script
+
+        return chain_script(plan)
     lines = ["def sila_continuous_motion():", "  actual = get_actual_joint_positions()", "  valid = True"]
     for i, value in enumerate(plan["start"]):
         lines += [f"  if norm(actual[{i}]-({value:.12f})) > 0.001745329252:", "    valid = False", "  end"]

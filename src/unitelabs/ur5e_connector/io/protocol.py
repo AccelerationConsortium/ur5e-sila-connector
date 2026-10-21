@@ -6,7 +6,7 @@ import time
 import math
 import uuid
 
-from . import choreography, motion_program
+from . import action_chain, choreography, motion_program, kinematics, playback
 from .joint_step import require_stopped
 
 from .joint_step import (
@@ -44,13 +44,19 @@ class Ur5eProtocol:
         elbow_step_receipt: str = "",
         enable_joint_testing: bool = False,
         enable_continuous_motion: bool = False,
+        enable_action_chains: bool = False,
+        enable_feedback_motion: bool = False,
         joint_test_receipt_directory: str = "",
     ) -> None:
         self.device = SimulatedDashboard()
         self.enable_continuous_motion = enable_continuous_motion
+        self.enable_action_chains = enable_action_chains
+        self.enable_feedback_motion = enable_feedback_motion
         self.motion_plans = {}
         self.motion_requests = {}
         self.motion_checkpoints = {}
+        self.active_motion = None
+        self.latest_motion_progress = {}
         self.enable_base_step = enable_base_step
         self.base_step_receipt = base_step_receipt
         self.base_step_reference = base_step_reference
@@ -330,6 +336,8 @@ class Ur5eProtocol:
                     "simulation": self.simulation_mode,
                     "slider_fraction": fraction,
                     "continuous_enabled": self.simulation_mode or self.enable_continuous_motion,
+                    "action_chains_enabled": self.simulation_mode or self.enable_action_chains,
+                    "feedback_motion_enabled": self.simulation_mode or self.enable_feedback_motion,
                     "remote_control": "simulated"
                     if self.simulation_mode
                     else "manual confirmation required on PolyScope 5.4",
@@ -378,6 +386,65 @@ class Ur5eProtocol:
             self.motion_plans[plan["id"]] = plan
             return json.dumps(choreography.public_plan(plan))
 
+    async def prepare_action_chain(
+        self, waypoints_json: str, speed: float, expected_mode: bool, automatic_timing: bool = False
+    ) -> str:
+        """Prepare a user-authored chain bound to fresh actual state without dispatching it."""
+        if not isinstance(waypoints_json, str) or len(waypoints_json.encode()) > 32768:
+            msg = "Action chain JSON must fit within 32768 bytes."
+            raise CommandRejected(msg)
+        try:
+            waypoints = json.loads(waypoints_json)
+        except ValueError as error:
+            msg = "Invalid action chain JSON."
+            raise CommandRejected(msg) from error
+        state = json.loads(await self.motion_preflight())
+        async with self._lock:
+            if (
+                expected_mode != self.simulation_mode
+                or state["simulation"] != self.simulation_mode
+                or not state["ready"]
+            ):
+                msg = "Preflight failed or backend changed; no action chain prepared."
+                raise CommandRejected(msg)
+            try:
+                compiler = action_chain.build_at_speed if automatic_timing else action_chain.build
+                plan = compiler(state["positions"], waypoints, speed)
+            except action_chain.TimingRejected as error:
+                raise CommandRejected(str(error)) from error
+            plan.update(
+                id=str(uuid.uuid4()),
+                simulation=self.simulation_mode,
+                expires=time.time() + 180,
+                slider_fraction=state["slider_fraction"],
+            )
+            self.motion_plans = {k: v for k, v in self.motion_plans.items() if v["expires"] > time.time()}
+            self.motion_plans[plan["id"]] = plan
+            return json.dumps(choreography.public_plan(plan))
+
+    async def suggest_action_chain_timing(self, waypoints_json: str, speed: float, expected_mode: bool) -> str:
+        """Calculate read-only timing alternatives through the same bounded compiler."""
+        if not isinstance(waypoints_json, str) or len(waypoints_json.encode()) > 32768:
+            msg = "Action chain JSON must fit within 32768 bytes."
+            raise CommandRejected(msg)
+        try:
+            waypoints = json.loads(waypoints_json)
+        except ValueError as error:
+            msg = "Invalid action chain JSON."
+            raise CommandRejected(msg) from error
+        state = json.loads(await self.motion_preflight())
+        async with self._lock:
+            if (
+                expected_mode != self.simulation_mode
+                or state["simulation"] != self.simulation_mode
+                or not state["ready"]
+            ):
+                msg = "Preflight failed or backend changed; no timing suggestion calculated."
+                raise CommandRejected(msg)
+            report = action_chain.recommend(state["positions"], waypoints, speed)
+            report["simulation"] = self.simulation_mode
+            return json.dumps(report)
+
     async def execute_motion(
         self, plan_id: str, request_id: str, expected_mode: bool, expires_at: float, remote_confirmed: bool
     ) -> str:
@@ -400,57 +467,212 @@ class Ur5eProtocol:
             if self.control_outcome_unknown:
                 msg = "Reconcile previous unknown outcome first."
                 raise CommandRejected(msg)
+            enabled = self.enable_action_chains if plan["kind"] == "action_chain" else self.enable_continuous_motion
             if not self.simulation_mode and (
-                not self.enable_continuous_motion or not remote_confirmed or not self.joint_test_receipt_directory
+                not enabled or not remote_confirmed or not self.joint_test_receipt_directory
             ):
                 msg = (
                     "Real continuous motion is disabled pending separate hardware qualification "
                     "and Remote Control confirmation."
                 )
                 raise CommandRejected(msg)
+            if plan.get("playback_controls") and not self.simulation_mode and not self.enable_feedback_motion:
+                msg = "Feedback-controlled real motion requires separate enable_feedback_motion hardware qualification."
+                raise CommandRejected(msg)
             self.motion_requests[request_id] = {"status": "reserved"}
             self.motion_plans.pop(plan_id)
             plan["dispatch_expires_at"] = min(expires_at, time.time() + 20)
-            if self.simulation_mode:
-                if not self.device.execute("programState").startswith("STOPPED") or not self.device.execute(
-                    "safetystatus"
-                ).endswith("NORMAL"):
-                    msg = "Simulator no longer stopped and normal."
-                    raise CommandRejected(msg)
-                if max(
-                    abs(a - b) for a, b in zip(self.device.joint_positions, plan["start"], strict=True)
-                ) > math.radians(0.1):
-                    msg = "Simulator pose changed after preview."
-                    raise CommandRejected(msg)
-                # Run every 125 Hz setpoint through the same pose validator; time is accelerated.
-                for q in plan["samples"]:
-                    self.device.joint_positions = tuple(choreography.pose(q))
-                result = {
-                    "status": "simulated",
-                    "simulation_mode": True,
-                    "plan_id": plan_id,
+            active = {
+                "request_id": request_id,
+                "stop": False,
+                "pause": False,
+                "supports_pause": plan.get("playback_controls", False),
+            }
+            self.active_motion = active
+            self.latest_motion_progress = {
+                "request_id": request_id,
+                "controller_state": "starting",
+                "completed_actions": 0,
+            }
+
+            def observe(report: dict) -> None:
+                self.latest_motion_progress = {
+                    **report,
                     "request_id": request_id,
-                    "after_radians": list(self.device.joint_positions),
-                    "sample_count": len(plan["samples"]),
-                    "duration": plan["duration"],
-                    "peak_speed": plan["peak_speed"],
-                    "peak_acceleration": plan["peak_acceleration"],
-                    "controller_program": choreography.script(plan),
-                    "validation": plan["validation"],
-                    "wall_clock": "accelerated kinematic simulation",
+                    "simulation": self.simulation_mode,
+                    "observed_at": time.time(),
+                    "source": "simulator interpolation samples"
+                    if self.simulation_mode
+                    else report.get("source", "measured RTDE joints"),
                 }
-                self.motion_requests[request_id] = result
-                return json.dumps(result)
+
             try:
+                if self.simulation_mode:
+                    if not self.device.execute("programState").startswith("STOPPED") or not self.device.execute(
+                        "safetystatus"
+                    ).endswith("NORMAL"):
+                        msg = "Simulator no longer stopped and normal."
+                        raise CommandRejected(msg)
+                    if max(
+                        abs(a - b) for a, b in zip(self.device.joint_positions, plan["start"], strict=True)
+                    ) > math.radians(0.1):
+                        msg = "Simulator pose changed after preview."
+                        raise CommandRejected(msg)
+                    ends = playback.boundaries(plan) if plan["kind"] == "action_chain" else [plan["duration"]]
+                    t, rate, target = 0.0, 1.0, None
+                    frames = []
+                    count = 0
+                    while t < plan["duration"]:
+                        if active["stop"]:
+                            break
+                        if active["pause"] and target is None:
+                            target = playback.pause_boundary(t, rate, ends)
+                        t, rate = playback.advance(t, rate, target, plan["dt"])
+                        index = min(len(plan["samples"]) - 1, round(t / plan["dt"]))
+                        self.device.joint_positions = tuple(choreography.pose(plan["samples"][index]))
+                        if count % 25 == 0:
+                            report = (
+                                playback.progress(
+                                    plan,
+                                    index,
+                                    "pausing" if target else "running",
+                                    round(target / plan["dt"]) if target else -1,
+                                )
+                                if plan["kind"] == "action_chain"
+                                else {"sample": index, "controller_state": "running"}
+                            )
+                            report.update(
+                                positions=list(self.device.joint_positions),
+                                runtime_state=2,
+                                robot_mode=7,
+                                safety_mode=1,
+                            )
+                            observe(report)
+                            frames.append(
+                                {
+                                    "path_seconds": t,
+                                    "actual_radians": list(self.device.joint_positions),
+                                    "target_radians": list(self.device.joint_positions),
+                                    "max_tracking_error_degrees": 0.0,
+                                    "simulation": True,
+                                }
+                            )
+                            await asyncio.sleep(0.02)
+                        count += 1
+                        if target is not None and rate == 0:
+                            break
+                    state = (
+                        "stopped" if active["stop"] else "paused" if target is not None and rate == 0 else "completed"
+                    )
+                    if plan["kind"] == "action_chain":
+                        observe(playback.progress(plan, min(len(plan["samples"]) - 1, round(t / plan["dt"])), state))
+                    else:
+                        observe({"controller_state": state})
+                    frames.append(
+                        {
+                            "path_seconds": min(t, plan["duration"]),
+                            "actual_radians": list(self.device.joint_positions),
+                            "target_radians": plan["samples"][min(len(plan["samples"]) - 1, round(t / plan["dt"]))],
+                            "max_tracking_error_degrees": 0.0,
+                            "simulation": True,
+                            "completion": state,
+                        }
+                    )
+                    result = {
+                        "status": "simulated",
+                        "completion": state,
+                        "simulation_mode": True,
+                        "plan_id": plan_id,
+                        "request_id": request_id,
+                        "after_radians": list(self.device.joint_positions),
+                        "sample_count": count,
+                        "duration": plan["duration"],
+                        "peak_speed": plan["peak_speed"],
+                        "peak_acceleration": plan["peak_acceleration"],
+                        "controller_program": choreography.script(plan),
+                        "validation": plan["validation"],
+                        "wall_clock": "accelerated kinematic simulation",
+                        "progress": self.latest_motion_progress,
+                        "trajectory": frames,
+                    }
+                    self.motion_requests[request_id] = result
+                    return json.dumps(result)
                 result = await motion_program.execute(
-                    self.host, pathlib.Path(self.joint_test_receipt_directory), request_id, plan
+                    self.host, pathlib.Path(self.joint_test_receipt_directory), request_id, plan, active, observe
                 )
                 self.motion_requests[request_id] = json.loads(result)
                 return result
             except (OutcomeUnknown, asyncio.CancelledError):
                 self.control_outcome_unknown = True
+                observe({**self.latest_motion_progress, "controller_state": "unknown"})
                 self.motion_requests[request_id] = {"status": "outcome_unknown"}
                 raise
+            finally:
+                self.active_motion = None
+
+    async def get_motion_progress(self) -> str:
+        """Read run-bound executor progress without waiting on the motion lock."""
+        return json.dumps(self.latest_motion_progress)
+
+    async def control_active_motion(self, request_id: str, action: str, expected_mode: bool) -> str:
+        """Request optional stop or boundary pause for this connector-owned run only."""
+        active = self.active_motion
+        if action not in {"stop", "pause_after_action"} or expected_mode != self.simulation_mode:
+            msg = "Invalid playback control or backend mode."
+            raise CommandRejected(msg)
+        if active is None or active["request_id"] != request_id:
+            msg = "This request is not the active connector-owned run. No command sent."
+            raise CommandRejected(msg)
+        if action == "pause_after_action" and not active["supports_pause"]:
+            msg = "This plan does not support boundary pause. Stop is available."
+            raise CommandRejected(msg)
+        active["stop" if action == "stop" else "pause"] = True
+        return json.dumps({"request_id": request_id, "requested": action, "confirmed_stopped": False})
+
+    async def solve_tcp(self, payload_json: str) -> str:
+        """Calculate nominal FK, IK or a task draft without dispatching motion."""
+        if not isinstance(payload_json, str) or len(payload_json.encode()) > 32768:
+            msg = "Kinematics payload is too large."
+            raise CommandRejected(msg)
+        data = json.loads(payload_json)
+        if not isinstance(data, dict):
+            msg = "Expected a kinematics object."
+            raise CommandRejected(msg)
+        seed = kinematics.vector(data.get("seed"), 6)
+        operation = data.get("operation")
+        if operation == "forward":
+            result = {
+                "tcp_pose": kinematics.coordinates(kinematics.forward(seed, data.get("tcp"))),
+                "model": kinematics.MODEL,
+            }
+        elif operation == "inverse":
+            result = await asyncio.to_thread(kinematics.inverse, data.get("target"), seed, data.get("tcp"))
+        elif operation == "task":
+            result = await asyncio.to_thread(kinematics.task_waypoints, data.get("settings"), seed)
+        else:
+            msg = "Choose forward, inverse or task."
+            raise CommandRejected(msg)
+        return json.dumps(result)
+
+    async def read_motion_trace(self, request_id: str) -> str:
+        """Read only this configured connector's trace for an existing motion request."""
+        validate_joint_test("Base", 1, request_id)
+        if request_id in self.motion_requests and self.simulation_mode:
+            record = self.motion_requests[request_id]
+            return json.dumps({"request_id": request_id, "simulation": True, "samples": record.get("trajectory", [])})
+        if not self.joint_test_receipt_directory:
+            msg = "No trace directory configured."
+            raise CommandRejected(msg)
+        path = pathlib.Path(self.joint_test_receipt_directory) / f"{request_id}.trajectory.jsonl"
+
+        def read() -> str:
+            if path.is_symlink() or path.stat().st_size > 20_000_000:
+                msg = "Trace unavailable or exceeds export limit."
+                raise CommandRejected(msg)
+            samples = [json.loads(line) for line in path.read_text().splitlines()]
+            return json.dumps({"request_id": request_id, "simulation": False, "samples": samples})
+
+        return await asyncio.to_thread(read)
 
     async def inspect_motion_request(self, request_id: str) -> str:
         """Read an existing receipt; never retry or clear uncertain control state."""

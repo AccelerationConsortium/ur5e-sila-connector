@@ -74,6 +74,19 @@ def test_http_origin_and_token_guards():
         headers = {'Content-Type':'application/json','X-Panel-Token':token,'Origin':'https://evil.example'}
         assert request('POST','/api/runs','{}',headers)[0] == 403
         assert request('GET','/',headers={'Host':'evil.example'})[0] == 403
+        assert request('GET','/composer-rotation.js')[0] == 200
+        assert b'Flow Dance' not in request('GET', '/')[1]
+        assert b'id="action-composer"' in request('GET', '/')[1]
+        for path, ancestor in [('/', "'none'"), ('/composer/embed', "'self'")]:
+            client = http.client.HTTPConnection('127.0.0.1', port)
+            client.request('GET', path)
+            response = client.getresponse()
+            assert response.status == 200
+            assert f"frame-ancestors {ancestor}" in response.getheader('Content-Security-Policy')
+            content = response.read()
+            if path.endswith('embed'):
+                assert b'<body class="embedded">' in content
+            client.close()
         assert request('GET','/features')[0] == 404
         assert request('GET','/../../pyproject.toml')[0] == 404
     finally:

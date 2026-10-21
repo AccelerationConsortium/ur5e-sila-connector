@@ -38,7 +38,7 @@ Run commands from the repository root. Each long-running service needs its own *
 .\scripts\run.ps1 python -m unitelabs.ur5e_connector.ui.server --simulation --port 8766
 ```
 
-Open **http://127.0.0.1:8766/** in Edge or Chrome. Verify **SIMULATED DEVICE**, open **Sequences**, load **Six-axis showreel**, preview the full range, and choose **Run once**. Wait for all 30 bounded moves to complete. This is a simulated sequence, not a physical movement.
+Open **http://127.0.0.1:8766/** in Edge or Chrome. Verify **SIMULATED DEVICE** and open **02 Sequences**. In **Action Composer**, read the current pose, import `examples/action-chain.simulation.json`, select a motion speed, and choose **Validate via SiLA**. Inspect **Play validated preview**, then choose **Run once via SiLA · simulation**. Follow the action cards to completion and export the run dataset. For the earlier Six-axis showreel, expand **Stepped routines & saved-position sequences**, load the preset, preview, then run once. Both workflows use the simulated device.
 
 **Terminal 3 — optional read-only query, smoke test, continuous simulation, and tests:**
 

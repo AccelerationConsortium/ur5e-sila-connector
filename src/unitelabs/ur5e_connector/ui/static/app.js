@@ -15,9 +15,18 @@ async function api(path, payload) {
   if (!response.ok) throw new Error(data.error || `Request failed (${response.status}).`);
   return data;
 }
-function activeJob() { return state?.jobs?.find(job => ["running", "queued"].includes(job.status)); }
+function activeJob() { return state?.jobs?.find(job => ["running", "queued", "pausing", "stopping", "paused"].includes(job.status)); }
 function controlsAvailable() { return Boolean(state?.connected && state.MotionControlsEnabled && state.SafetyStatus === "NORMAL" && state.ProgramState === "STOPPED" && !state.ControlOutcomeUnknown && !activeJob() && !submitting); }
 function selectView(view) {
+  if (!["control", "sequences", "positions"].includes(view)) view = "control";
+  document.body.dataset.view = view;
+  history.replaceState(null, "", `#${view}`);
+  const inspector = document.querySelector(".inspector");
+  $(view === "sequences" ? "legacy-inspector-host" : "live-inspector-host").append(inspector);
+  if (view === "sequences") {
+    const frame = $("action-composer");
+    if (!frame.hasAttribute("src")) frame.src = frame.dataset.src;
+  }
   document.querySelectorAll(".view").forEach(element => element.hidden = element.id !== `view-${view}`);
   document.querySelectorAll(".nav").forEach(element => element.classList.toggle("active", element.dataset.view === view));
   const title = {control: "Live control", sequences: "Sequences", positions: "Saved positions"}[view];
@@ -118,7 +127,7 @@ function drawPositions() {
   positions.forEach(position => {
     const card = node("article", "position-card"); card.append(node("h3", "", position.name));
     const p = position.tool_pose; card.append(node("p", "", `X ${fixed(p[0] * 1000, 1)} · Y ${fixed(p[1] * 1000, 1)} · Z ${fixed(p[2] * 1000, 1)} mm`));
-    const button = node("button", "outline small", "Add to sequence →"); button.addEventListener("click", () => { rows.push({position_id: position.id}); clearPreview(); renderRows(); selectView("sequences"); }); card.append(button); $("position-list").append(card);
+    const button = node("button", "outline small", "Add to sequence →"); button.addEventListener("click", () => { rows.push({position_id: position.id}); clearPreview(); renderRows(); $("legacy-sequences").open = true; selectView("sequences"); }); card.append(button); $("position-list").append(card);
   });
 }
 function drawStatus() {
@@ -129,7 +138,7 @@ function drawStatus() {
   $("program-state").textContent = connected ? state.ProgramState : "—"; $("version").textContent = connected ? state.SoftwareVersion : "—"; $("robot-mode").textContent = connected ? state.RobotMode : "—";
   $("last-read").textContent = connected ? new Date(state.updated_at).toLocaleTimeString("en-GB") : "—";
   $("endpoint").textContent = `127.0.0.1:${state?.control_port || "—"}`;
-  const error = !connected ? state?.error || "Waiting for live robot status." : state.ControlOutcomeUnknown ? "A previous control result is uncertain. Inspect the controller before continuing." : !state.MotionControlsEnabled ? "Motion controls are disabled in the connector configuration." : "";
+  const error = !connected ? state?.error || "Waiting for live robot status." : state.ControlOutcomeUnknown ? "A previous control result is uncertain. Inspect the controller before continuing." : !state.MotionControlsEnabled ? "Jog and stepped motion are disabled. Action Composer reports its own execution availability." : "";
   $("error-banner").hidden = !error; $("error-banner").textContent = error;
   ["x", "y", "z"].forEach((axis, index) => $("tcp-" + axis).textContent = connected ? fixed(state.ToolPose[index] * 1000, 1) : "—");
   $("tcp-orientation").textContent = connected ? `RX ${fixed(state.ToolPose[3], 3)}   RY ${fixed(state.ToolPose[4], 3)}   RZ ${fixed(state.ToolPose[5], 3)} rad${state.simulation ? " · simulated pose" : ""}` : "RX —   RY —   RZ — rad";
@@ -145,7 +154,6 @@ function drawStatus() {
   if (!state?.jobs?.length) $("activity-list").append(node("p", "muted", "No panel runs yet."));
   else state.jobs.slice(0, 5).forEach(item => { const row = node("div", "activity-row"); row.append(node("span", "", new Date(item.created_at).toLocaleTimeString("en-GB")), node("span", "", `${item.completed}/${item.total} moves · ${item.speed}°/s`), node("span", item.status === "completed" ? "success" : item.status === "attention_required" ? "attention" : "", item.status.replaceAll("_", " "))); $("activity-list").append(row); });
   drawJoints(); drawPositions(); speedChanged();
-  $("flow-run").disabled = !flowAvailable();
   if (activeJob()?.kind) $("cancel-run").disabled = true;
 }
 async function refresh() {
@@ -176,33 +184,12 @@ setInterval(refresh, 1500);
 api("/routines.json").then(data => { routines = data; $("load-dance").disabled = false; }).catch(error => toast(error.message));
 $("load-dance").addEventListener("click", () => { const routine = routines.find(r => r.id === "slow-dance"); if (!routine) return; rows = routine.rows.map(row => ({...row})); $("speed").value = routine.speed; clearPreview(); speedChanged(); renderRows(); toast("Slow Dance loaded. Preview the full range before running."); });
 
-let flowPlan = null, flowCheck = null;
-const AXIS_COLORS = ["#e6b467", "#8cdbb4", "#a5bdf0", "#ef9fa3", "#bba4e4", "#a5d9e3"];
-function flowAvailable() { return Boolean(flowPlan && flowCheck?.ready && flowCheck?.continuous_enabled && state?.connected && !activeJob() && !submitting); }
-function drawFlowPlan(plan) {
-  flowPlan = plan;
-  $("flow-summary").textContent = `${plan.kind === "reset" ? "Return to captured reference" : "Continuous Flow Dance"} · ${plan.duration} controller seconds · amplitude ${Math.round((plan.amplitude_scale || 1)*100)}% · cap ${plan.speed}°/s · peak ${fixed(plan.peak_speed, 2)}°/s · peak acceleration ${fixed(plan.peak_acceleration, 2)}°/s². Six axes share one timeline. Chart: angle deviation from reference. Reference ${plan.checkpoint_id.slice(0,8)}. Preview expires in 3 minutes.`;
-  $("flow-ranges").replaceChildren();
-  plan.ranges.forEach((range,index) => { const item = node("div", "", `${pretty(range.joint)}: ${fixed(range.min,1)}° … ${fixed(range.max,1)}°`); item.style.color = AXIS_COLORS[index]; $("flow-ranges").append(item); });
-  const chart = $("flow-chart"); chart.removeAttribute("hidden"); chart.replaceChildren();
-  const initial = plan.preview_samples[0].degrees;
-  const amplitude = Math.max(1,...plan.preview_samples.flatMap(sample => sample.degrees.map((q,i) => Math.abs(q-initial[i]))));
-  JOINTS.forEach((joint,index) => { const line = document.createElementNS("http://www.w3.org/2000/svg", "polyline"); line.setAttribute("points",plan.preview_samples.map(sample => `${10+sample.t/plan.duration*580},${90-(sample.degrees[index]-initial[index])/amplitude*75}`).join(" ")); line.setAttribute("fill","none"); line.setAttribute("stroke",AXIS_COLORS[index]); line.setAttribute("stroke-width","1.6"); chart.append(line); });
-  $("reset-preview").disabled = false;
-  $("flow-run").disabled = !flowAvailable();
-}
-function drawFlowCheck(check) {
-  flowCheck = check; $("motion-checks").replaceChildren();
-  check.checks.forEach(item => $("motion-checks").append(node("div",item.passed ? "" : "failed",`${item.passed ? "✓" : "×"} ${item.name}${item.scan ? " · " + item.scan.count + " records · " + fixed(item.scan.elapsed_ms, 1) + " ms" : ""}`)));
-  $("flow-gate").textContent = check.simulation ? "SIMULATION · accelerated kinematics only; no physical movement." : check.continuous_enabled ? "REAL ROBOT · separately enabled; Remote Control confirmation required." : "REAL EXECUTION DISABLED · prepare and inspect here; test execution in the simulation panel on port 8766.";
-}
-async function flowPreflight() { const check = await api("/api/motion/check",{}); drawFlowCheck(check); return check; }
-$("motion-check").addEventListener("click",() => action(flowPreflight));
-for (const id of ["flow-speed","flow-duration"]) $(id).addEventListener("change",()=>{flowPlan=null;$("flow-run").disabled=true;$("flow-summary").textContent="Settings changed. Prepare a fresh preview.";});
-async function prepareFlow(reset, lowSpeed = false) { await action(async()=>{ await flowPreflight(); const plan=await api("/api/motion/preview",{speed:Number($("flow-speed").value),duration:lowSpeed ? 30 : Number($("flow-duration").value),reset,low_speed:lowSpeed}); drawFlowPlan(plan); toast(reset ? "Return-to-reference preview ready. No movement sent." : "Continuous trajectory prepared. No movement sent."); }); }
-$("flow-preview").addEventListener("click",()=>prepareFlow(false));
-$("reset-preview").addEventListener("click",()=>prepareFlow(true));
-$("flow-run").addEventListener("click",()=>action(async()=>{ if (!flowPlan) return; const runId=crypto.randomUUID(); localStorage.setItem("ur5e-last-run",runId); await api("/api/motion/run",{plan_id:flowPlan.id,run_id:runId,remote_confirmed:$("remote-confirmed").checked}); flowPlan=null; $("flow-run").disabled=true; toast("Prepared continuous motion submitted once through SiLA."); }));
-$("inspect-run").addEventListener("click",()=>action(async()=>{ const result=await api("/api/motion/inspect",{}); $("motion-inspection").hidden=false; $("motion-inspection").textContent=JSON.stringify({run_id:result.run_id,request_id:result.request_id,status:result.status,receipt_created_at:result.receipt_created_at,panel_failed_at:result.panel_failed_at,message:result.message},null,2); }));
 
-$("low-speed-preview").addEventListener("click",()=>prepareFlow(false,true));
+window.addEventListener("message", event => {
+  const frame = $("action-composer");
+  if (event.origin !== location.origin || event.source !== frame.contentWindow || event.data?.type !== "composer-height") return;
+  const height = event.data.height;
+  if (Number.isFinite(height) && height >= 300 && height <= 30000) frame.style.height = `${Math.ceil(height)}px`;
+});
+window.addEventListener("hashchange", () => selectView(location.hash.slice(1)));
+selectView(location.hash.slice(1) || "control");

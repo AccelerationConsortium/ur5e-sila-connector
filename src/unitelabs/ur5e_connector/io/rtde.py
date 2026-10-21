@@ -123,3 +123,45 @@ class ToolMonitor(JointMonitor):
             msg = "Invalid tool telemetry values."
             raise DeviceUnavailable(msg)
         return list(values[:6]), values[6]
+
+
+class PlaybackMonitor(JointMonitor):
+    """Own external RTDE input registers 24/25 and read run-bound progress outputs 24-27."""
+
+    def __init__(self, host: str, token: int) -> None:
+        super().__init__(host)
+        self.token = token
+        self.input_recipe = 0
+        self.progress = (-1, 0, 0, -1)
+
+    async def open(self) -> None:
+        """Negotiate exclusive control registers; reject IN_USE before any program dispatch."""
+        await self._open_outputs(
+            b"timestamp,actual_q,actual_qd,robot_mode,safety_mode,runtime_state,output_int_register_24,output_int_register_25,output_int_register_26,output_int_register_27",
+            b"DOUBLE,VECTOR6D,VECTOR6D,INT32,INT32,UINT32,INT32,INT32,INT32,INT32",
+        )
+        await self._send(73, b"input_int_register_24,input_int_register_25")
+        response = await self._response(73)
+        if len(response) < 2 or response[0] == 0 or response[1:] != b"INT32,INT32":
+            await self.close()
+            msg = "Playback RTDE registers 24/25 unavailable or already in use. No program sent."
+            raise DeviceUnavailable(msg)
+        self.input_recipe = response[0]
+        await self.command(False)
+
+    async def command(self, pause: bool) -> None:
+        """Set a run-token-bound pause request; never resume or start a program."""
+        await self._send(85, struct.pack(">Bii", self.input_recipe, int(pause), self.token))
+
+    async def sample(self) -> JointSample:
+        """Read fresh joint observations and controller-owned progress markers."""
+        payload = await self._response(85)
+        if len(payload) != 133 or payload[0] != self.recipe:
+            msg = "Unexpected playback RTDE packet."
+            raise DeviceUnavailable(msg)
+        values = struct.unpack(">13diiI4i", payload[1:])
+        if not all(math.isfinite(v) for v in values[:13]):
+            msg = "Non-finite playback telemetry."
+            raise DeviceUnavailable(msg)
+        self.progress = tuple(values[16:20])
+        return JointSample(values[0], tuple(values[1:7]), tuple(values[7:13]), *values[13:16])
