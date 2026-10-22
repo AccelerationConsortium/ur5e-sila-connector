@@ -4,7 +4,9 @@ Control a Universal Robots UR5e through **SiLA 2**, with a Control Desk and a vi
 
 Design a continuous six-axis action chain in the browser, validate it through SiLA, and inspect execution progress and trajectory data. Start with the simulated device before connecting a robot.
 
-**Real motion is disabled in every shipped configuration.** Opening the UI does not start movement. This development connector is not a certified robot safety system.
+
+https://github.com/user-attachments/assets/44477df1-d249-40c0-934a-b4af42ec1a3f
+
 
 ## Action Composer
 
