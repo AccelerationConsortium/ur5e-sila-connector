@@ -5,9 +5,11 @@ from unitelabs.cdk import Connector
 from unitelabs.cdk.features.core.lock_controller import LockController
 
 from .config import Ur5eConnectorConfig
+from .features.plate_gripper import PlateGripperController
 from .features.robot_controller import RobotController
 from .features.simulation_controller import SimulationController
 from .io import Ur5eProtocol
+from .io.plate_gripper import PlateGripper
 
 __version__ = version("unitelabs-ur5e-connector")
 
@@ -35,6 +37,7 @@ async def create_app(config: Ur5eConnectorConfig) -> collections.abc.AsyncGenera
     app.register(LockController())
     app.register(SimulationController(protocol))
     app.register(RobotController(protocol))
+    app.register(PlateGripperController(PlateGripper(protocol)))
     try:
         await protocol.open()
         yield app

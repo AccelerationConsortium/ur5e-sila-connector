@@ -14,8 +14,15 @@ English browser panel (loopback HTTP)
 
 - `io.unitelabs/robot/RobotController/v1`
 - `org.silastandard/core/SimulationController/v1`
+- `io.unitelabs/robot/PlateGripperController/v1`
 
 Important read-only properties include `SoftwareVersion`, `JointPositions`, `ToolPose`, `SpeedSliderFraction`, `RobotMode`, `SafetyStatus`, `ProgramState`, `LoadedProgram`, `Running`, `ControlOutcomeUnknown`, and `MotionControlsEnabled`. JointPositions is radians; the UI converts it to degrees. The `MotionPreflight` command reports readiness and the continuous-motion gate separately.
+
+## Plate gripper
+
+`PlateGripperController` grips and releases SBS microplates (85.48 mm across the long sides) with a parallel gripper. No gripper hardware has been chosen, so it runs in simulation only: real mode reports `GripperState` `UNAVAILABLE` and refuses `GripPlate` and `ReleasePlate` with `DeviceUnavailable`. It never moves the arm and refuses commands while a motion is active.
+
+The simulated fingers know nothing about the arm's surroundings. A simulation client says what is at the current grasp point with `SetSimulatedObject` (0 mm for nothing); `GripPlate` then stops on that width, and is refused when nothing is met or the width differs by more than 2 mm. Finger travel takes simulated time at 100 mm/s. `io/plate_gripper.py` holds the backend; a hardware driver replaces `SimulatedPlateGripper` there.
 
 ## Commands
 
